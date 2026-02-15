@@ -1,0 +1,22 @@
+{
+  "name": "escrowcontract",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.js --network shardeum",
+    "interact": "hardhat run scripts/interact.js --network shardeum",
+    "dev": "npx serve frontend -l 3000",
+    "node": "hardhat node"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^17.3.1",
+    "hardhat": "^2.28.0"
+  }
+}

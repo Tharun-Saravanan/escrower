@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escrow DApp — Shardeum</title>
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ────────────────────────────────────────── */
+    .wrapper { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem; }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    header h1 {
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: .35rem;
+    }
+    header p { color: #94a3b8; font-size: .95rem; }
+
+    /* ── Wallet Bar ────────────────────────────────────── */
+    .wallet-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .75rem;
+      background: #1e2030;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .wallet-info { display: flex; flex-direction: column; gap: .2rem; }
+    .wallet-info .label { font-size: .75rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; }
+    .wallet-info .value { font-size: .95rem; font-family: 'Courier New', monospace; word-break: break-all; }
+    .wallet-info .balance { color: #34d399; font-weight: 600; }
+
+    /* ── Buttons ───────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .65rem 1.3rem;
+      font-size: .9rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-green { background: #059669; color: #fff; }
+    .btn-green:hover:not(:disabled) { background: #047857; }
+    .btn-red { background: #dc2626; color: #fff; }
+    .btn-red:hover:not(:disabled) { background: #b91c1c; }
+    .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+    .btn-outline:hover:not(:disabled) { border-color: #60a5fa; color: #60a5fa; }
+    .btn-sm { padding: .45rem .9rem; font-size: .82rem; }
+
+    /* ── Cards / Panels ────────────────────────────────── */
+    .card {
+      background: #1e2030;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 {
+      font-size: 1.15rem;
+      margin-bottom: 1rem;
+      color: #f1f5f9;
+    }
+
+    /* ── Form ──────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: .3rem; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: .8rem; color: #94a3b8; }
+    .form-group input {
+      background: #0f1117;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: .6rem .8rem;
+      color: #e2e8f0;
+      font-size: .92rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .form-group input:focus { border-color: #3b82f6; }
+    .form-group input::placeholder { color: #475569; }
+
+    /* ── Deals Table ───────────────────────────────────── */
+    .deals-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .deals-header h2 { margin-bottom: 0; }
+
+    .deal-card {
+      background: #161825;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      padding: 1.15rem;
+      margin-bottom: .75rem;
+      transition: border-color .2s;
+    }
+    .deal-card:hover { border-color: #3b82f6; }
+
+    .deal-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: .75rem;
+    }
+    .deal-id { font-weight: 700; font-size: 1rem; color: #f1f5f9; }
+
+    .status-badge {
+      display: inline-block;
+      padding: .2rem .65rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .status-awaiting { background: #fbbf2433; color: #fbbf24; }
+    .status-confirmed { background: #60a5fa33; color: #60a5fa; }
+    .status-completed { background: #34d39933; color: #34d399; }
+    .status-refunded { background: #f8717133; color: #f87171; }
+
+    .deal-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .5rem;
+      font-size: .85rem;
+    }
+    @media (max-width: 600px) { .deal-details { grid-template-columns: 1fr; } }
+    .deal-details .detail-label { color: #64748b; }
+    .deal-details .detail-value { font-family: 'Courier New', monospace; word-break: break-all; }
+    .deal-details .detail-value.amount { color: #fbbf24; font-weight: 600; }
+
+    .confirm-badges {
+      display: flex;
+      gap: .5rem;
+      margin: .75rem 0;
+    }
+    .confirm-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      padding: .2rem .55rem;
+      border-radius: 6px;
+      font-size: .78rem;
+      font-weight: 500;
+    }
+    .confirm-badge.yes { background: #34d39922; color: #34d399; }
+    .confirm-badge.no { background: #47556922; color: #64748b; }
+
+    .deal-actions {
+      display: flex;
+      gap: .5rem;
+      margin-top: .75rem;
+      flex-wrap: wrap;
+    }
+
+    /* ── Toast ─────────────────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .toast {
+      padding: .75rem 1.1rem;
+      border-radius: 8px;
+      font-size: .88rem;
+      animation: slideIn .3s ease;
+      max-width: 380px;
+      word-break: break-word;
+    }
+    .toast-success { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
+    .toast-error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+    .toast-info { background: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── Spinner ───────────────────────────────────────── */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #ffffff44;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty State ───────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: #64748b;
+    }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: .75rem; }
+    .empty-state p { font-size: .92rem; }
+
+    /* ── Network Banner ────────────────────────────────── */
+    .network-banner {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      background: #1a1c2e;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: .5rem 1rem;
+      margin-bottom: 1.5rem;
+      font-size: .82rem;
+      color: #94a3b8;
+    }
+    .network-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+    }
+    .network-dot.disconnected { background: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Header -->
+    <header>
+      <h1>Escrow DApp</h1>
+      <p>Trustless escrow on Shardeum — funds locked until both parties confirm</p>
+    </header>
+
+    <!-- Network Banner -->
+    <div class="network-banner">
+      <span class="network-dot disconnected" id="netDot"></span>
+      <span id="netText">Not connected</span>
+    </div>
+
+    <!-- Wallet Bar -->
+    <div class="wallet-bar">
+      <div class="wallet-info">
+        <span class="label">Wallet</span>
+        <span class="value" id="walletAddr">—</span>
+        <span class="label" style="margin-top:.3rem">Balance</span>
+        <span class="value balance" id="walletBal">— SHM</span>
+      </div>
+      <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">
+        Connect MetaMask
+      </button>
+    </div>
+
+    <!-- Create Deal -->
+    <div class="card" id="createCard">
+      <h2>Create New Deal</h2>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Seller Address</label>
+          <input type="text" id="sellerAddr" placeholder="0x..." />
+        </div>
+        <div class="form-group">
+          <label>Amount (SHM)</label>
+          <input type="number" id="dealAmount" placeholder="0.1" step="0.001" min="0" />
+        </div>
+        <div class="form-group" style="justify-content:flex-end;">
+          <button class="btn btn-primary" id="createDealBtn" onclick="createDeal()" disabled>
+            Create Deal
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lookup Deal -->
+    <div class="card">
+      <h2>Lookup Deal</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Deal ID</label>
+          <input type="number" id="lookupId" placeholder="0" min="0" />
+        </div>
+        <div class="form-group" style="justify-content:flex-end;">
+          <button class="btn btn-outline" onclick="lookupDeal()" id="lookupBtn" disabled>
+            Search
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deals List -->
+    <div class="card">
+      <div class="deals-header">
+        <h2>Deals</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadAllDeals()" id="refreshBtn" disabled>
+          Refresh
+        </button>
+      </div>
+      <div id="dealsList">
+        <div class="empty-state">
+          <div class="icon">🔒</div>
+          <p>Connect your wallet to view deals</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contract Info -->
+    <div class="card" style="text-align:center; font-size:.82rem; color:#64748b;">
+      Contract: <a id="contractLink" href="https://explorer-mezame.shardeum.org/address/0xfB49C354476Da798FE3334B69469a48D31cC2950" target="_blank">
+        0xfB49C354476Da798FE3334B69469a48D31cC2950
+      </a><br/>
+      Network: Shardeum EVM Testnet (Chain 8119)
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    //  CONFIG
+    // ═══════════════════════════════════════════════════════════════
+    const CONTRACT_ADDRESS = "0xfB49C354476Da798FE3334B69469a48D31cC2950";
+    const SHARDEUM_CHAIN_ID = "0x1fb7"; // 8119 in hex
+    const SHARDEUM_RPC = "https://api-mezame.shardeum.org";
+    const EXPLORER = "https://explorer-mezame.shardeum.org";
+
+    const ABI = [
+      "function createDeal(address _seller) payable returns (uint256)",
+      "function confirm(uint256 _dealId)",
+      "function releaseFunds(uint256 _dealId)",
+      "function refund(uint256 _dealId)",
+      "function dealCount() view returns (uint256)",
+      "function getDeal(uint256 _dealId) view returns (address buyer, address seller, uint256 amount, bool buyerConfirmed, bool sellerConfirmed, uint8 status)",
+      "event DealCreated(uint256 indexed dealId, address indexed buyer, address indexed seller, uint256 amount)",
+      "event Confirmed(uint256 indexed dealId, address indexed party)",
+      "event FundsReleased(uint256 indexed dealId, uint256 amount)",
+      "event Refunded(uint256 indexed dealId, uint256 amount)"
+    ];
+
+    const STATUS_NAMES = ["AWAITING CONFIRMATION", "CONFIRMED", "COMPLETED", "REFUNDED"];
+    const STATUS_CLASSES = ["status-awaiting", "status-confirmed", "status-completed", "status-refunded"];
+
+    let provider, signer, contract, userAddress;
+
+    // ═══════════════════════════════════════════════════════════════
+    //  WALLET CONNECTION
+    // ═══════════════════════════════════════════════════════════════
+    async function connectWallet() {
+      if (!window.ethereum) {
+        toast("Please install MetaMask!", "error");
+        return;
+      }
+
+      const btn = document.getElementById("connectBtn");
+      btn.innerHTML = '<span class="spinner"></span> Connecting…';
+      btn.disabled = true;
+
+      try {
+        // Request accounts
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+
+        // Switch / add Shardeum network
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: SHARDEUM_CHAIN_ID }]
+          });
+        } catch (switchErr) {
+          if (switchErr.code === 4902) {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [{
+                chainId: SHARDEUM_CHAIN_ID,
+                chainName: "Shardeum EVM Testnet",
+                rpcUrls: [SHARDEUM_RPC],
+                blockExplorerUrls: [EXPLORER],
+                nativeCurrency: { name: "SHM", symbol: "SHM", decimals: 18 }
+              }]
+            });
+          }
+        }
+
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+        // Update UI
+        document.getElementById("walletAddr").textContent = userAddress;
+        const bal = await provider.getBalance(userAddress);
+        document.getElementById("walletBal").textContent = parseFloat(ethers.utils.formatEther(bal)).toFixed(4) + " SHM";
+        btn.textContent = shortAddr(userAddress);
+        btn.classList.remove("btn-primary");
+        btn.classList.add("btn-green");
+
+        document.getElementById("netDot").classList.remove("disconnected");
+        document.getElementById("netText").textContent = "Shardeum EVM Testnet (Chain 8119)";
+
+        document.getElementById("createDealBtn").disabled = false;
+        document.getElementById("lookupBtn").disabled = false;
+        document.getElementById("refreshBtn").disabled = false;
+
+        toast("Wallet connected!", "success");
+        loadAllDeals();
+      } catch (err) {
+        console.error(err);
+        toast(err.message || "Connection failed", "error");
+        btn.innerHTML = "Connect MetaMask";
+        btn.disabled = false;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  CREATE DEAL
+    // ═══════════════════════════════════════════════════════════════
+    async function createDeal() {
+      const sellerAddr = document.getElementById("sellerAddr").value.trim();
+      const amount = document.getElementById("dealAmount").value.trim();
+
+      if (!ethers.utils.isAddress(sellerAddr)) {
+        toast("Invalid seller address", "error");
+        return;
+      }
+      if (!amount || parseFloat(amount) <= 0) {
+        toast("Enter a valid amount", "error");
+        return;
+      }
+
+      const btn = document.getElementById("createDealBtn");
+      btn.innerHTML = '<span class="spinner"></span> Creating…';
+      btn.disabled = true;
+
+      try {
+        const tx = await contract.createDeal(sellerAddr, {
+          value: ethers.utils.parseEther(amount)
+        });
+        toast("Transaction sent! Waiting for confirmation…", "info");
+        const receipt = await tx.wait();
+        toast(`Deal created! Tx: ${shortTx(receipt.transactionHash)}`, "success");
+        document.getElementById("sellerAddr").value = "";
+        document.getElementById("dealAmount").value = "";
+        loadAllDeals();
+      } catch (err) {
+        console.error(err);
+        toast(parseError(err), "error");
+      } finally {
+        btn.innerHTML = "Create Deal";
+        btn.disabled = false;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  DEAL ACTIONS
+    // ═══════════════════════════════════════════════════════════════
+    async function confirmDeal(dealId) {
+      try {
+        toast(`Confirming deal #${dealId}…`, "info");
+        const tx = await contract.confirm(dealId);
+        await tx.wait();
+        toast(`Deal #${dealId} confirmed!`, "success");
+        loadAllDeals();
+      } catch (err) {
+        toast(parseError(err), "error");
+      }
+    }
+
+    async function releaseFunds(dealId) {
+      try {
+        toast(`Releasing funds for deal #${dealId}…`, "info");
+        const tx = await contract.releaseFunds(dealId);
+        await tx.wait();
+        toast(`Funds released for deal #${dealId}!`, "success");
+        loadAllDeals();
+      } catch (err) {
+        toast(parseError(err), "error");
+      }
+    }
+
+    async function refundDeal(dealId) {
+      try {
+        toast(`Refunding deal #${dealId}…`, "info");
+        const tx = await contract.refund(dealId);
+        await tx.wait();
+        toast(`Deal #${dealId} refunded!`, "success");
+        loadAllDeals();
+      } catch (err) {
+        toast(parseError(err), "error");
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  LOAD DEALS
+    // ═══════════════════════════════════════════════════════════════
+    async function loadAllDeals() {
+      if (!contract) return;
+      const count = await contract.dealCount();
+      const n = count.toNumber();
+
+      const container = document.getElementById("dealsList");
+
+      if (n === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <p>No deals yet. Create the first one!</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      // Load newest first
+      for (let i = n - 1; i >= 0; i--) {
+        const deal = await contract.getDeal(i);
+        container.appendChild(renderDealCard(i, deal));
+      }
+
+      // Update balance
+      const bal = await provider.getBalance(userAddress);
+      document.getElementById("walletBal").textContent = parseFloat(ethers.utils.formatEther(bal)).toFixed(4) + " SHM";
+    }
+
+    async function lookupDeal() {
+      const id = document.getElementById("lookupId").value;
+      if (id === "" || id < 0) { toast("Enter a valid deal ID", "error"); return; }
+
+      try {
+        const deal = await contract.getDeal(id);
+        const container = document.getElementById("dealsList");
+        container.innerHTML = "";
+        container.appendChild(renderDealCard(parseInt(id), deal));
+      } catch (err) {
+        toast("Deal not found", "error");
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  RENDER DEAL CARD
+    // ═══════════════════════════════════════════════════════════════
+    function renderDealCard(id, deal) {
+      const [buyer, seller, amount, buyerConf, sellerConf, status] = deal;
+      const isBuyer = buyer.toLowerCase() === userAddress.toLowerCase();
+      const isSeller = seller.toLowerCase() === userAddress.toLowerCase();
+      const amountEth = ethers.utils.formatEther(amount);
+
+      const div = document.createElement("div");
+      div.className = "deal-card";
+
+      let actionsHtml = "";
+
+      // Status 0: AWAITING_CONFIRMATION
+      if (status === 0) {
+        if (isBuyer && !buyerConf) {
+          actionsHtml += `<button class="btn btn-green btn-sm" onclick="confirmDeal(${id})">✓ Confirm as Buyer</button>`;
+        }
+        if (isSeller && !sellerConf) {
+          actionsHtml += `<button class="btn btn-green btn-sm" onclick="confirmDeal(${id})">✓ Confirm as Seller</button>`;
+        }
+        if (isBuyer) {
+          actionsHtml += `<button class="btn btn-red btn-sm" onclick="refundDeal(${id})">↩ Refund</button>`;
+        }
+      }
+      // Status 1: CONFIRMED
+      if (status === 1 && isBuyer) {
+        actionsHtml += `<button class="btn btn-green btn-sm" onclick="releaseFunds(${id})">💰 Release Funds</button>`;
+      }
+
+      let roleTag = "";
+      if (isBuyer) roleTag = '<span style="color:#60a5fa;font-size:.78rem;font-weight:600;margin-left:.5rem;">YOU: BUYER</span>';
+      else if (isSeller) roleTag = '<span style="color:#a78bfa;font-size:.78rem;font-weight:600;margin-left:.5rem;">YOU: SELLER</span>';
+
+      div.innerHTML = `
+        <div class="deal-top">
+          <span class="deal-id">Deal #${id}${roleTag}</span>
+          <span class="status-badge ${STATUS_CLASSES[status]}">${STATUS_NAMES[status]}</span>
+        </div>
+        <div class="deal-details">
+          <div>
+            <span class="detail-label">Buyer</span><br/>
+            <span class="detail-value">${shortAddr(buyer)}</span>
+          </div>
+          <div>
+            <span class="detail-label">Seller</span><br/>
+            <span class="detail-value">${shortAddr(seller)}</span>
+          </div>
+          <div>
+            <span class="detail-label">Amount</span><br/>
+            <span class="detail-value amount">${amountEth} SHM</span>
+          </div>
+          <div>
+            <span class="detail-label">Explorer</span><br/>
+            <a href="${EXPLORER}/address/${CONTRACT_ADDRESS}" target="_blank" style="font-size:.85rem;">View Contract ↗</a>
+          </div>
+        </div>
+        <div class="confirm-badges">
+          <span class="confirm-badge ${buyerConf ? 'yes' : 'no'}">${buyerConf ? '✓' : '✗'} Buyer</span>
+          <span class="confirm-badge ${sellerConf ? 'yes' : 'no'}">${sellerConf ? '✓' : '✗'} Seller</span>
+        </div>
+        ${actionsHtml ? `<div class="deal-actions">${actionsHtml}</div>` : ''}
+      `;
+
+      return div;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ═══════════════════════════════════════════════════════════════
+    function shortAddr(addr) {
+      return addr.slice(0, 6) + "…" + addr.slice(-4);
+    }
+
+    function shortTx(hash) {
+      return hash.slice(0, 10) + "…" + hash.slice(-6);
+    }
+
+    function parseError(err) {
+      if (err.reason) return err.reason;
+      if (err.data && err.data.message) return err.data.message;
+      if (err.message && err.message.length < 200) return err.message;
+      return "Transaction failed";
+    }
+
+    function toast(msg, type = "info") {
+      const container = document.getElementById("toasts");
+      const el = document.createElement("div");
+      el.className = `toast toast-${type}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 5000);
+    }
+
+    // ── Listen for account / chain changes ────────────────────
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", () => location.reload());
+      window.ethereum.on("chainChanged", () => location.reload());
+    }
+  </script>
+</body>
+</html>
